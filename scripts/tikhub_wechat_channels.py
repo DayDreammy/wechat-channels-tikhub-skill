@@ -9,6 +9,7 @@
 import argparse
 import json
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -18,15 +19,21 @@ import requests
 API_BASE = "https://api.tikhub.io"
 
 
-def _api_get(api_key: str, path: str, params: Dict[str, Any]) -> Dict[str, Any]:
+def _api_get(api_key: str, path: str, params: Dict[str, Any], retries: int, retry_wait: float) -> Dict[str, Any]:
     url = f"{API_BASE}{path}"
-    resp = requests.get(url, params=params, headers={"Authorization": f"Bearer {api_key}"}, timeout=30)
-    if resp.status_code != 200:
-        raise RuntimeError(f"HTTP {resp.status_code} {resp.text[:500]}")
-    data = resp.json()
-    if data.get("code") != 200:
-        raise RuntimeError(f"API error: {data}")
-    return data
+    last_err = None
+    for attempt in range(retries):
+        resp = requests.get(url, params=params, headers={"Authorization": f"Bearer {api_key}"}, timeout=30)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("code") == 200:
+                return data
+            last_err = f"API error: {data}"
+        else:
+            last_err = f"HTTP {resp.status_code} {resp.text[:500]}"
+        if attempt < retries - 1:
+            time.sleep(retry_wait)
+    raise RuntimeError(last_err or "API request failed")
 
 
 def _select_user(data: List[Dict[str, Any]], index: int) -> Dict[str, Any]:
@@ -95,6 +102,8 @@ def main() -> None:
     parser.add_argument("--decrypt-api", default="http://localhost:3005", help="Decrypt API base URL")
     parser.add_argument("--skip-decrypt", action="store_true", help="Skip decryption step")
     parser.add_argument("--skip-download", action="store_true", help="Skip download if encrypted file exists")
+    parser.add_argument("--retries", type=int, default=3, help="API retry attempts (default: 3)")
+    parser.add_argument("--retry-wait", type=float, default=2.0, help="Seconds between retries (default: 2.0)")
 
     args = parser.parse_args()
 
@@ -109,7 +118,7 @@ def main() -> None:
         res = _api_get(args.api_key, "/api/v1/wechat_channels/fetch_user_search", {
             "keywords": args.keyword,
             "page": args.page,
-        })
+        }, retries=args.retries, retry_wait=args.retry_wait)
         data = res.get("data", [])
         print(f"Search results: {len(data)}")
         for i, item in enumerate(data[:10]):
@@ -124,7 +133,8 @@ def main() -> None:
             raise RuntimeError("Selected user has no username")
         print(f"Selected username: {username}")
 
-    home = _api_get(args.api_key, "/api/v1/wechat_channels/fetch_home_page", {"username": username})
+    home = _api_get(args.api_key, "/api/v1/wechat_channels/fetch_home_page", {"username": username},
+                    retries=args.retries, retry_wait=args.retry_wait)
     home_data = home.get("data", {})
     videos = _get_object_list(home_data)
     print(f"Videos fetched: {len(videos)}")
