@@ -46,6 +46,25 @@ python /home/yy/.codex/skills/wechat-channels-tikhub/scripts/tikhub_wechat_chann
 - `output/<video_id>_decrypted.mp4`
 - `output/<video_id>_meta.json`
 
+## Media utilities
+
+- Compress decrypted video to <=50MB:
+
+```bash
+python /home/yy/.codex/skills/wechat-channels-tikhub/scripts/compress_video_to_size.py \
+  --input output/<video_id>_decrypted.mp4 \
+  --target-mb 50
+```
+
+- Extract audio file:
+
+```bash
+python /home/yy/.codex/skills/wechat-channels-tikhub/scripts/extract_audio.py \
+  --input output/<video_id>_decrypted.mp4 \
+  --codec aac \
+  --bitrate 128
+```
+
 ## Troubleshooting
 
 - **HTTP 402**: balance不足，微信视频号接口不接受免费额度。

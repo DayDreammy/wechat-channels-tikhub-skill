@@ -54,3 +54,22 @@ curl -X POST http://localhost:3005/api/decrypt \
   -F "decode_key=<decode_key>" \
   -o decrypted.mp4
 ```
+
+## Media utilities
+
+Compress decrypted video to target size (default 50 MB):
+
+```bash
+python /home/yy/.codex/skills/wechat-channels-tikhub/scripts/compress_video_to_size.py \
+  --input output/<video_id>_decrypted.mp4 \
+  --target-mb 50
+```
+
+Extract audio from decrypted video:
+
+```bash
+python /home/yy/.codex/skills/wechat-channels-tikhub/scripts/extract_audio.py \
+  --input output/<video_id>_decrypted.mp4 \
+  --codec aac \
+  --bitrate 128
+```
